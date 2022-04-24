@@ -1,8 +1,8 @@
 
-AVRASM ver. 2.1.51  C:\Users\olegr\OneDrive\Документы\AVRStudio 5.1\AVRAssembler1\AVRAssembler1\AVRAssembler1.asm Thu Mar 17 06:50:40 2022
+AVRASM ver. 2.1.51  C:\Users\olegr\OneDrive\Документы\AVRStudio 5.1\Atmega8\Atmega8\Atmega8.asm Mon Apr 25 00:19:12 2022
 
 [builtin](2): Including file 'C:\Program Files (x86)\Atmel\AVR Studio 5.1\extensions\Atmel\AVRAssembler\2.1.51.17\AvrAssembler/Include\m8def.inc'
-C:\Users\olegr\OneDrive\Документы\AVRStudio 5.1\AVRAssembler1\AVRAssembler1\AVRAssembler1.asm(1): Including file 'C:\Program Files (x86)\Atmel\AVR Studio 5.1\extensions\Atmel\AVRAssembler\2.1.51.17\AvrAssembler/Include\m8def.inc'
+C:\Users\olegr\OneDrive\Документы\AVRStudio 5.1\Atmega8\Atmega8\Atmega8.asm(1): Including file 'C:\Program Files (x86)\Atmel\AVR Studio 5.1\extensions\Atmel\AVRAssembler\2.1.51.17\AvrAssembler/Include\m8def.inc'
                  
                  .include "m8def.inc" 
                  
@@ -788,168 +788,674 @@ C:\Users\olegr\OneDrive\Документы\AVRStudio 5.1\AVRAssembler1\AVRAssembler1\AVRA
                  
                  ; ***** END OF FILE ******************************************************
                  
-                 .def temp    = r16                        // simbolic names to registers
-                 .def timer_0 = r17
-                 .def timer_2 = r18
+                 .def			temp = r16                        // simbolic names to registers
+                 .def			count_i = r22
+                 .def			count_j = r23
+                 .def			timer_1_reg = r24
+                 .def			timer_2_reg = r25
+                 .def			status = r20
                  
-                 .equ BITRATE = 9600 
-                 .equ BAUD = 8000000 / (16 * BITRATE) - 1  // to reg UBRR (Uart Baud rate reg)
+                 .equ			BITRATE = 9600 
+                 .equ			BAUD = 8000000 / (16 * BITRATE) - 1  // to reg UBRR (Uart Baud rate reg)
+                 .equ			num_of_var_bytes = 20
+                 .equ			num_of_str_1_bytes = 20
+                 .equ			num_of_str_2_bytes = 20
                  
-                 .equ TIMER_INT_1 = 0x02
-                 .equ TIMER_INT_2 = 0x01
+                 .macro print_string
+                 				ldi	ZL, LOW(2*@0)   // 1 cycle
+                 				ldi	ZH, HIGH(2*@0)  // 1 cycle
+                 				rcall puts			// 3 cycles
                  
-                 .macro TIMER_INT
-                 		ldi r21, 0xFF
-                 		ldi r22, @0
-                 		sub r21, r22
-                 		out @1, r21
-                 .endm
+                 				.endmacro
                  
-                 	.dseg                                // data seg
+                 .macro degree
+                 				mov	r18, @0
                  
-                 	.cseg                                // program seg
-                 	.org 0                               // reset initial address 
-000000 c00d      		rjmp Reset 
-                 	.org $004
-000004 c027      		rjmp TIM0_OVF 
-                 	.org $009
-000009 c02c      		rjmp TIM2_OVF
-                 	.org $00b
-00000b c034      		rjmp USART_RXC
-                 	.org $00d  
-00000d c037      		rjmp USART_TXC
+                 				ldi temp, @1
+                 				ldi r17, 1
+                 
+                 				one_time:
+                 				cpi r18, 0
+                 				breq @2
+                 
+                 				mul r17, temp
+                 				dec r18
+                 				mov r17, r0
+                 
+                 				rjmp one_time
+                 
+                 				.endmacro
+                 
+                 .macro change_timer
+                 				print_string @0
+                 
+                 				rcall start_p_X_reg
+                 				ldi count_j, 0
+                 				rcall getc
+                 
+                 				ldi r21, 0x00
+                 				rcall start_p_X_reg
+                 				rcall check_num
+                 
+                 				mov @1, r21
+                 
+                 				cbr status, 0x01
+                 				rcall start_p_X_reg
+                 
+                 				sei
+                 				reti
+                 
+                 				.endmacro
+                 
+                 .macro change_string
+                 				print_string @0
+                 				rcall start_p_X_reg
+                 				rcall getc_str
+                 
+                 				ldi count_j, 0
+                 
+                 				ldi	YL, LOW(@1)
+                 				ldi	YH, HIGH(@1)
+                 
+                 				rcall start_p_X_reg
+                 
+                 				one_more_time:
+                 
+                 					ld r19, X+
+                 					inc count_i
+                 					st Y+, r19
+                 					inc count_j
+                 
+                 				cpi r19, 0
+                 				brne one_more_time
+                 				
+                 				rcall start_p_X_reg
+                 				rcall start_p_Y_reg
+                 
+                 				cbr status, 0x01
+                 				sbr status, @2
+                 
+                 				reti
+                 
+                 				.endmacro
+                 
+                 .dseg
+                 
+                 .org			SRAM_START
+000060           var:			.byte num_of_var_bytes
+000074           str_1:			.byte num_of_str_1_bytes
+000088           str_2:			.byte num_of_str_2_bytes
+                 
+                 .cseg
+                 
+000000 c00d      .org 0			rjmp Reset
+000004 c038      .org $004		rjmp TIM2_OVF
+000009 c024      .org $009		rjmp TIM0_OVF
+00000b c061      .org $00b		rjmp USART_RXC
+00000d c080      .org $00d		rjmp USART_TXC
                  
                  
+00000e e004      Reset:			ldi temp, high(RAMEND)				// stack init, where u can put all interrupts
+00000f bf0e      				out SPH, temp						// RAMEND - the tip of the stack
+000010 e50f      				ldi temp, low(RAMEND)
+000011 bf0d      				out SPL, temp 
                  
-                 Reset: 
-00000e e004      	ldi temp, high(RAMEND)				// stack init, where u can put all interrupts
-00000f bf0e      	out SPH, temp						// RAMEND - the tip of the stack
-000010 e50f      	ldi temp, low(RAMEND)
-000011 bf0d      	out SPL, temp 
+000012 e000      				ldi temp, high(BAUD) 
+000013 bd00      				out UBRRH, temp      
+000014 e303      				ldi temp, low(BAUD)
+000015 b909      				out UBRRL, temp 
                  
-000012 e000      	ldi temp, high(BAUD) 
-000013 bd00      	out UBRRH, temp      
-000014 e303      	ldi temp, low(BAUD)
-000015 b909      	out UBRRL, temp 
+000016 ed08      				ldi temp, 0b11011000                // enable RXCIE, TXCIE, RXEN, TXEN
+000017 b90a      				out UCSRB, temp      
                  
-000016 ed08      	ldi temp, 0b11011000                // enable RXCIE, TXCIE, RXEN, TXEN
-000017 b90a      	out UCSRB, temp      
+000018 e806      				ldi temp, 0b10000110				// enable URSEL & UCSZ (8 bit)
+000019 bd00      				out UCSRC, temp						
                  
-000018 e806      	ldi temp, 0b10000110				// enable URSEL & UCSZ (8 bit)
-000019 bd00      	out UCSRC, temp						
+00001a ef0f      				ldi temp, 0xff						// out PORTD
+00001b bb01      				out DDRD, temp
                  
-00001a ef0f      	ldi temp, 0xff						// out PORTD
-00001b bb01      	out DDRD, temp 
+00001c e005      				ldi temp, 0b00000101
+00001d bf03      				out TCCR0, temp
+00001e e007      				ldi temp, 0b00000111
+00001f bd05      				out TCCR2, temp  
                  
-00001c e005      	ldi temp, 0b00000101				// CS1 - divider on 1024
-00001d bd05      	out TCCR2, temp
-00001e bf03      	out TCCR0, temp    
+000020 e401      				ldi temp, 0b01000001
+000021 bf09      				out TIMSK, temp
+000022 bf08      				out TIFR, temp
                  
-00001f e401      	ldi temp, 0b01000001
-000020 bf09      	out TIMSK, temp					    // in TIMSK enable TOIE1
-000021 bf08      	out TIFR, temp					    // in TOV1 enable TIFR 		
+000023 ef8f      				ldi timer_1_reg, 0xFF
+000024 bf82      				out TCNT0, timer_1_reg
+000025 ef9f      				ldi timer_2_reg, 0xFF
+000026 bd94      				out TCNT2, timer_2_reg
                  
-000022 ef5f
-000023 e062
-000024 1b56
-000025 bf52      	TIMER_INT TIMER_INT_1, TCNT0	
-000026 ef5f
-000027 e061
-000028 1b56
-000029 bd54      	TIMER_INT TIMER_INT_2, TCNT2     
-                 	
+000027 e6a0      				ldi	XL, LOW(var)
+000028 e0b0      				ldi	XH, HIGH(var)
+                 
+000029 e040      				ldi status, 0x00
+00002a e060      				ldi count_i, 0x00
+00002b e070      				ldi count_j, 0x00
+                 
+00002c 9478      				sei
+                 
+00002d cfff      main:			rjmp main
+                            
+00002e 94f8      TIM0_OVF:		cli 
+                 				
+00002f fd40      				sbrc status, 0
+000030 c009      				rjmp pass_ping
+                 					
+000031 fd41      				sbrc status, 1
+000032 c004      				rjmp printY_1
+                 
+000033 e6ee
+000034 e0f2
+000035 d01f      				print_string ping
+000036 c003      				rjmp pass_ping
+                 
+                 				printY_1:
+000037 e7c4      				ldi	YL, LOW(str_1)
+000038 e0d0      				ldi	YH, HIGH(str_1)
+                 
+000039 d012      				rcall puts_Y
+                 
+                 				pass_ping:
+                 
+00003a bf82      				out TCNT0, timer_1_reg
+00003b 9478      				sei
+                                 
+00003c 9518      				reti
+                 
+00003d 94f8      TIM2_OVF:		cli 
+                 
+00003e fd40      				sbrc status, 0
+00003f c009      				rjmp pass_pong
+                 					
+000040 fd42      				sbrc status, 2
+000041 c004      				rjmp printY_2
+                 
+000042 e7e8
+000043 e0f2
+000044 d010      				print_string pong
+000045 c003      				rjmp pass_pong
+                 
+                 				printY_2:
+000046 e8c8      				ldi	YL, LOW(str_2)
+000047 e0d0      				ldi	YH, HIGH(str_2)
+                 
+000048 d003      				rcall puts_Y
+                 
+                 				pass_pong:
+                 
+000049 bd94      				out TCNT2, timer_2_reg
+00004a 9478      				sei
+                 				                
+00004b 9518      				reti
+                 
+00004c 9139      puts_Y:			ld	r19, Y+	
+00004d 9573      				inc count_j
+00004e 3030      				cpi	r19, 0
+00004f f021      				breq puts_end_Y
+                 
+000050 9b5d      puts_wait_Y:	sbis UCSRA, UDRE
+000051 cffe      				rjmp puts_wait_Y
+                 
+000052 b93c      				out	UDR, r19
+000053 cff8      				rjmp puts_Y
+                 
+000054 9508      puts_end_Y:		ret
+                 
+000055 9135      puts:			lpm	r19, Z+ 		  // 3 cycles
+000056 3030      				cpi	r19, 0			  // 1 cycle
+000057 f021      				breq puts_end		  // 1/2 cycles
+                 
+000058 9b5d      puts_wait:		sbis UCSRA, UDRE	  // 1/2/3 cycles
+000059 cffe      				rjmp puts_wait		  // 2 cycles
+                 
+00005a b93c      				out	UDR, r19		  // 1 cycle
+00005b cff9      				rjmp puts			  // 2 cycles
+                 
+00005c 9508      puts_end:		ret					  // 4 cycles
+                 
+00005d 9b5d      putc:			sbis UCSRA, UDRE
+00005e cffe      				rjmp putc
+                 
+00005f b91c      				out	UDR, r17
+                 
+000060 9508      				ret
+                 
+000061 e010      timers_sum:		ldi r17, 0x00
+000062 e000      				ldi r16, 0x00
+000063 2f38      				mov r19, timer_1_reg
+000064 2f29      				mov r18, timer_2_reg
+                 
+000065 0f32      				add r19, r18
+000066 1f10      				adc r17, r16
+000067 dff5      				rcall putc
+                 
+000068 2f13      				mov r17, r19
+000069 dff3      				rcall putc
+                 
+00006a 7f4e      				cbr status, 0x01
+00006b 9478      				sei
+00006c 9518      				reti
+                 
+00006d 94f8      USART_RXC:		cli
+00006e 9b5f      				sbis UCSRA, RXC
+00006f cffd      				rjmp USART_RXC
+                 
+000070 6041      				sbr status, 0x01
+                 
+000071 b13c      				in r19, UDR
+                 
+000072 363d      				cpi r19, $6d          // ASCII m
+000073 f049      				breq print_out_menu
+                 
+000074 3733      				cpi r19, $73          // ASCII s
+000075 f359      				breq timers_sum
+                 
+000076 933d      				st X+, r19
+000077 9563      				inc count_i
+                 
+000078 b93c      				out UDR, r19
+                 
+000079 303d      				cpi r19, $0D
+00007a f1c9      				breq check_input
+                 
+00007b 9478      				sei	
+00007c 9518      				reti
+                 
+00007d e8e2
+00007e e0f2
+00007f dfd5      print_out_menu: print_string change_timer_1
+000080 e9e8
+000081 e0f2
+000082 dfd2      				print_string change_timer_2
+000083 eaee
+000084 e0f2
+000085 dfcf      				print_string reset_timers
+000086 ece8
+000087 e0f2
+000088 dfcc      				print_string change_str_timer_1
+000089 eee2
+00008a e0f2
+00008b dfc9      				print_string change_str_timer_2
+                 
+00008c 9478      				sei
+00008d 9518      				reti
+                 
+00008e 94f8      USART_TXC:		cli				      // disable interrupts
+00008f 9b5d      				sbis UCSRA, UDRE      // wait for data to be received
+000090 cffd      				rjmp USART_TXC
+                 
+000091 9478      				sei				      // enable interrupts
+000092 9518      				reti
+                 
+000093 9b5f      getc_str:		sbis UCSRA, RXC
+000094 cffe      				rjmp getc_str
+                 
+000095 b13c      				in r19, UDR
+                 
+000096 303d      				cpi r19, $0D
+000097 f021      				breq end_getc_str
+                 
+000098 b93c      				out UDR, r19
+                 
+000099 933d      				st X+, r19
+00009a 9563      				inc count_i
+                 
+00009b cff7      				rjmp getc_str
+                 
+00009c e030      end_getc_str:	ldi r19, 0
+00009d 933d      				st X+, r19
+00009e 9563      				inc count_i
+                 
+00009f 9508      				ret
+                 
+0000a0 e4ec
+0000a1 e0f3
+0000a2 dfb2
+0000a3 d072
+0000a4 dfee
+0000a5 e070
+0000a6 e7c4
+0000a7 e0d0
+0000a8 d06d
+0000a9 913d
+0000aa 9563
+0000ab 9339
+0000ac 9573
+0000ad 3030
+0000ae f7d1
+0000af d066
+0000b0 d06b
+0000b1 7f4e
+0000b2 6042
+0000b3 9518      str_1_changing:	change_string str_1_chang_input, str_1, 0x02
+                 
+0000b4 d061      check_input:	rcall start_p_X_reg
+                 				
+0000b5 913d      				ld r19, X+
+0000b6 9563      				inc count_i
+                 
+0000b7 3331      				cpi r19, '1'
+0000b8 f0b9      				breq timer_1_chang
+                 
+0000b9 3332      				cpi r19, '2'
+0000ba f119      				breq timer_2_chang
+                 
+0000bb 3333      				cpi r19, '3'
+0000bc f041      				breq reseting_timers
+                 
+0000bd 3334      				cpi r19, '4'
+0000be f309      				breq str_1_changing
+                 
+0000bf 3335      				cpi r19, '5'
+0000c0 f159      				breq str_2_changing
+                 
+0000c1 7f4e      				cbr status, 0x01
+0000c2 d053      				rcall start_p_X_reg
+                 
+0000c3 9478      				sei
+0000c4 9518      				reti
+                 
+                 reseting_timers:
+0000c5 e3e4
+0000c6 e0f3
+0000c7 df8d      				print_string reset_input
+0000c8 ef8f      				ldi timer_1_reg, 0xFF
+0000c9 bf82      				out TCNT0, timer_1_reg
+0000ca ef9f      				ldi timer_2_reg, 0xFF
+0000cb bd94      				out TCNT2, timer_2_reg
+                 
+0000cc 7f4e      				cbr status, 0x01
+0000cd d048      				rcall start_p_X_reg
+                 
+0000ce 9478      				sei
+0000cf 9518      				reti
+                 
+0000d0 efec
+0000d1 e0f2
+0000d2 df82
+0000d3 d042
+0000d4 e070
+0000d5 d04c
+0000d6 e050
+0000d7 d03e
+0000d8 d027
+0000d9 2f85
+0000da 7f4e
+0000db d03a
+0000dc 9478
+0000dd 9518      timer_1_chang:	change_timer time_1_input, timer_1_reg
+                 
+0000de e1e8
+0000df e0f3
+0000e0 df74
+0000e1 d034
+0000e2 e070
+0000e3 d03e
+0000e4 e050
+0000e5 d030
+0000e6 d019
+0000e7 2f95
+0000e8 7f4e
+0000e9 d02c
+0000ea 9478
+0000eb 9518      timer_2_chang:	change_timer time_2_input, timer_2_reg
+                 
+0000ec e5ec
+0000ed e0f3
+0000ee df66
+0000ef d026
+0000f0 dfa2
+0000f1 e070
+0000f2 e8c8
+0000f3 e0d0
+0000f4 d021
+0000f5 913d
+0000f6 9563
+0000f7 9339
+0000f8 9573
+0000f9 3030
+0000fa f7d1
+0000fb d01a
+0000fc d01f
+0000fd 7f4e
+0000fe 6044
+0000ff 9518      str_2_changing: change_string str_2_chang_input, str_2, 0x04
+                 
+000100 3074      check_num:		cpi count_j, 4
+000101 f578      				brsh print_error
+                 
+000102 913d      				ld r19, X+
+000103 9563      				inc count_i
+000104 957a      				dec count_j
+                 
+000105 2f27
+000106 e00a
+000107 e011
+000108 3020
+000109 f021
+00010a 9f10
+00010b 952a
+00010c 2d10
+00010d cffa      				degree count_j, 10, end_degree
+                 				end_degree:
+                 
+00010e 9f13      				mul r17, r19
+00010f 2d10      				mov r17, r0
+000110 0f51      				add r21, r17
+000111 f0f8      				brcs print_error
+                 
+000112 3070      				cpi count_j, 0
+000113 f009      				breq end_check_num
+                 
+000114 cfeb      				rjmp check_num
+                 
+000115 9508      end_check_num:	ret
+                 				
+000116 3060      start_p_X_reg:	cpi count_i, 0
+000117 f019      				breq end_start_p_X_reg
+                 
+000118 913e      				ld r19, -X
+000119 956a      				dec count_i
+                 
+00011a cffb      				rjmp start_p_X_reg
+                 
+                 end_start_p_X_reg:
+00011b 9508      				ret
+                 
+00011c 3070      start_p_Y_reg:	cpi count_j, 0
+00011d f019      				breq end_start_p_Y_reg
+                 
+00011e 913a      				ld r19, -Y
+00011f 957a      				dec count_j
+                 
+000120 cffb      				rjmp start_p_Y_reg
+                 
+                 end_start_p_Y_reg:
+000121 9508      				ret
+                 
+000122 9b5f      getc:			sbis UCSRA, RXC
+000123 cffe      				rjmp getc
+                 
+000124 b13c      				in r19, UDR
+                 
+000125 303d      				cpi r19, $0D
+000126 f049      				breq end_getc
                  		
-00002a 9478      sei
+000127 333a      				cpi r19, 0x3A
+000128 f440      				brsh print_error
                  
-                 main: 
-00002b cfff      	rjmp main
+000129 b93c      				out UDR, r19
                  
-                 TIM0_OVF:     
-00002c 94f8      cli  
-00002d ebe2      	ldi	ZL, LOW(2*ping)
-00002e e0f0      	ldi	ZH, HIGH(2*ping)
+00012a e300      				ldi temp, 48
+00012b 1b30      				sub r19, temp
                  
-00002f d01a      	rcall puts
+00012c 933d      				st X+, r19
+00012d 9563      				inc count_i
+00012e 9573      				inc count_j
                  
-000030 ef5f
-000031 e062
-000032 1b56
-000033 bf52      	TIMER_INT TIMER_INT_1, TCNT0 
-000034 9478      sei 
-000035 9518      reti        
-                  
-                 TIM2_OVF:
-000036 94f8      cli 
-000037 ebec      	ldi	ZL, LOW(2*pong)
-000038 e0f0      	ldi	ZH, HIGH(2*pong)
-                 	 
-000039 d010      	rcall puts
-                 	//rcall substruction
+00012f cff2      				rjmp getc
                  
-00003a ef5f
-00003b e061
-00003c 1b56
-00003d bd54      	TIMER_INT TIMER_INT_2, TCNT2
-00003e 9478      sei                 
-00003f 9518      reti            
-                          
+000130 9508      end_getc:		ret
                  
-                 USART_RXC:
-000040 94f8      	cli				   // disable interrupts
-000041 9b5f      	sbis UCSRA, RXC      // wait for data to be received
-000042 cfc8      		rjmp UCSRA
-000043 9478      	sei	
-000044 9518      reti			   // enable interrupts
+000131 e6ec
+000132 e0f3
+000133 df21      print_error:	print_string error
                  
+000134 7f4e      				cbr status, 0x01
+000135 dfe0      				rcall start_p_X_reg
                  
-                 USART_TXC:
-000045 94f8      	cli				   // disable interrupts
-000046 9b5d      	sbis UCSRA, UDRE      // wait for data to be received
-000047 cff8      		rjmp USART_RXC 
-000048 9478      	sei				   // enable interrupts
-000049 9518      reti
+000136 9518      				reti
                  
+000137 6970
+000138 676e
+000139 6e5c
+00013a 725c
+C:\Users\olegr\OneDrive\Документы\AVRStudio 5.1\Atmega8\Atmega8\Atmega8.asm(434): warning: .cseg .db misalignment - padding zero byte
+00013b 0000      ping:               .db "ping\n\r", 0
+00013c 6f70
+00013d 676e
+00013e 6e5c
+00013f 725c
+C:\Users\olegr\OneDrive\Документы\AVRStudio 5.1\Atmega8\Atmega8\Atmega8.asm(435): warning: .cseg .db misalignment - padding zero byte
+000140 0000      pong:               .db "pong\n\r", 0
                  
-                 puts:	
-00004a 9135      	lpm	r19, Z+				// load character from pmem
-00004b 3030      	cpi	r19, 0				// check if null
-00004c f021      	breq puts_end			// branch if null
+                 // Menu
+000141 2e31
+000142 4320
+000143 6168
+000144 676e
+000145 2065
+000146 4954
+000147 454d
+000148 5f52
+000149 5c31
+00014a 5c6e
+00014b 0072      change_timer_1:     .db "1. Change TIMER_1\n\r", 0
+00014c 2e32
+00014d 4320
+00014e 6168
+00014f 676e
+000150 2065
+000151 4954
+000152 454d
+000153 5f52
+000154 5c32
+000155 5c6e
+000156 0072      change_timer_2:     .db "2. Change TIMER_2\n\r", 0
+000157 2e33
+000158 5220
+000159 5345
+00015a 5445
+00015b 5420
+00015c 4d49
+00015d 5245
+00015e 2053
+00015f 2c31
+000160 3220
+000161 6e5c
+000162 725c
+C:\Users\olegr\OneDrive\Документы\AVRStudio 5.1\Atmega8\Atmega8\Atmega8.asm(440): warning: .cseg .db misalignment - padding zero byte
+000163 0000      reset_timers:       .db "3. RESET TIMERS 1, 2\n\r", 0
+000164 2e34
+000165 4320
+000166 6168
+000167 676e
+000168 2065
+000169 4954
+00016a 454d
+00016b 5f52
+00016c 5f31
+00016d 5453
+00016e 5c52
+00016f 5c6e
+000170 0072      change_str_timer_1: .db "4. Change TIMER_1_STR\n\r", 0
+000171 2e35
+000172 4320
+000173 6168
+000174 676e
+000175 2065
+000176 4954
+000177 454d
+000178 5f52
+000179 5f32
+00017a 5453
+00017b 5c52
+00017c 5c6e
+00017d 0072      change_str_timer_2: .db "5. Change TIMER_2_STR\n\r", 0
                  
-                 puts_wait:
-00004d 9b5d      	sbis UCSRA, UDRE
-00004e cffe      	rjmp puts_wait
+                 // Timer 1 changing string
+00017e 7954
+00017f 6570
+000180 5420
+000181 4d49
+000182 5245
+000183 315f
+000184 495f
+000185 544e
+000186 5245
+000187 4156
+000188 3a4c
+000189 6e5c
+00018a 725c
+C:\Users\olegr\OneDrive\Документы\AVRStudio 5.1\Atmega8\Atmega8\Atmega8.asm(445): warning: .cseg .db misalignment - padding zero byte
+00018b 0000      time_1_input:		.db "Type TIMER_1_INTERVAL:\n\r", 0
                  
-00004f b93c      	out	UDR, r19			// transmit character
-000050 cff9      	rjmp puts				// repeat loop
+                 // Timer 2 changing string
+00018c 7954
+00018d 6570
+00018e 5420
+00018f 4d49
+000190 5245
+000191 325f
+000192 495f
+000193 544e
+000194 5245
+000195 4156
+000196 3a4c
+000197 6e5c
+000198 725c
+C:\Users\olegr\OneDrive\Документы\AVRStudio 5.1\Atmega8\Atmega8\Atmega8.asm(448): warning: .cseg .db misalignment - padding zero byte
+000199 0000      time_2_input:		.db "Type TIMER_2_INTERVAL:\n\r", 0
                  
-                 puts_end:
-000051 9518      	reti	
+                 // Timers reseting string
+00019a 4552
+00019b 4553
+00019c 4954
+00019d 474e
+00019e 5420
+00019f 4d49
+0001a0 5245
+0001a1 2e53
+0001a2 2e2e
+0001a3 5c3a
+0001a4 5c6e
+0001a5 0072      reset_input:		.db "RESETING TIMERS...:\n\r", 0
                  
+                 // String 1 changing string
+0001a6 7954
+0001a7 6570
+0001a8 5320
+0001a9 5254
+0001aa 315f
+0001ab 5c3a
+0001ac 5c6e
+0001ad 0072      str_1_chang_input:	.db "Type STR_1:\n\r", 0
                  
-                 substruction:
-000052 9b5d      	sbis UCSRA, UDRE
-000053 cffe      	rjmp substruction
+                 // String 2 changing string
+0001ae 7954
+0001af 6570
+0001b0 5320
+0001b1 5254
+0001b2 325f
+0001b3 5c3a
+0001b4 5c6e
+0001b5 0072      str_2_chang_input:	.db "Type STR_2:\n\r", 0
                  
-000054 e052      	ldi r21, TIMER_INT_1
-000055 e061      	ldi r22, TIMER_INT_2
-000056 1b56      	sub r21, r22
-                 
-000057 b95c      	out	UDR, r21
-000058 9518      reti
-                 	
-                 
-                 
-000059 6970
-00005a 676e
-00005b 6e5c
-00005c 725c
-C:\Users\olegr\OneDrive\Документы\AVRStudio 5.1\AVRAssembler1\AVRAssembler1\AVRAssembler1.asm(142): warning: .cseg .db misalignment - padding zero byte
-00005d 0000      ping: .db "ping\n\r", 0
-00005e 6f70
-00005f 676e
-000060 6e5c
-000061 725c
-C:\Users\olegr\OneDrive\Документы\AVRStudio 5.1\AVRAssembler1\AVRAssembler1\AVRAssembler1.asm(143): warning: .cseg .db misalignment - padding zero byte
+0001b6 5245
+0001b7 4f52
 
 
 RESOURCE USE INFORMATION
@@ -967,40 +1473,40 @@ counted separately from r26..r31 here.
 .dseg memory usage only counts static data declared with .byte
 
 "ATmega8" register use summary:
-r0 :   0 r1 :   0 r2 :   0 r3 :   0 r4 :   0 r5 :   0 r6 :   0 r7 :   0 
+r0 :   2 r1 :   0 r2 :   0 r3 :   0 r4 :   0 r5 :   0 r6 :   0 r7 :   0 
 r8 :   0 r9 :   0 r10:   0 r11:   0 r12:   0 r13:   0 r14:   0 r15:   0 
-r16:  20 r17:   0 r18:   0 r19:   3 r20:   0 r21:  15 r22:  10 r23:   0 
-r24:   0 r25:   0 r26:   0 r27:   0 r28:   0 r29:   0 r30:   2 r31:   2 
-x  :   0 y  :   0 z  :   1 
-Registers used: 7 out of 35 (20.0%)
+r16:  27 r17:  10 r18:   5 r19:  43 r20:  16 r21:   5 r22:  11 r23:  15 
+r24:   7 r25:   7 r26:   1 r27:   1 r28:   4 r29:   4 r30:  13 r31:  13 
+x  :   9 y  :   4 z  :   1 
+Registers used: 20 out of 35 (57.1%)
 
 "ATmega8" instruction use summary:
-.lds  :   0 .sts  :   0 adc   :   0 add   :   0 adiw  :   0 and   :   0 
+.lds  :   0 .sts  :   0 adc   :   1 add   :   2 adiw  :   0 and   :   0 
 andi  :   0 asr   :   0 bclr  :   0 bld   :   0 brbc  :   0 brbs  :   0 
-brcc  :   0 brcs  :   0 breq  :   1 brge  :   0 brhc  :   0 brhs  :   0 
-brid  :   0 brie  :   0 brlo  :   0 brlt  :   0 brmi  :   0 brne  :   0 
-brpl  :   0 brsh  :   0 brtc  :   0 brts  :   0 brvc  :   0 brvs  :   0 
-bset  :   0 bst   :   0 cbi   :   0 cbr   :   0 clc   :   0 clh   :   0 
+brcc  :   0 brcs  :   1 breq  :  16 brge  :   0 brhc  :   0 brhs  :   0 
+brid  :   0 brie  :   0 brlo  :   0 brlt  :   0 brmi  :   0 brne  :   2 
+brpl  :   0 brsh  :   2 brtc  :   0 brts  :   0 brvc  :   0 brvs  :   0 
+bset  :   0 bst   :   0 cbi   :   0 cbr   :   8 clc   :   0 clh   :   0 
 cli   :   4 cln   :   0 clr   :   0 cls   :   0 clt   :   0 clv   :   0 
-clz   :   0 com   :   0 cp    :   0 cpc   :   0 cpi   :   1 cpse  :   0 
-dec   :   0 eor   :   0 fmul  :   0 fmuls :   0 fmulsu:   0 icall :   0 
-ijmp  :   0 in    :   0 inc   :   0 ld    :   0 ldd   :   0 ldi   :  23 
-lds   :   0 lpm   :   1 lsl   :   0 lsr   :   0 mov   :   0 movw  :   0 
-mul   :   0 muls  :   0 mulsu :   0 neg   :   0 nop   :   0 or    :   0 
-ori   :   0 out   :  17 pop   :   0 push  :   0 rcall :   2 ret   :   0 
-reti  :   6 rjmp  :  11 rol   :   0 ror   :   0 sbc   :   0 sbci  :   0 
-sbi   :   0 sbic  :   0 sbis  :   4 sbiw  :   0 sbr   :   0 sbrc  :   0 
-sbrs  :   0 sec   :   0 seh   :   0 sei   :   5 sen   :   0 ser   :   0 
+clz   :   0 com   :   0 cp    :   0 cpc   :   0 cpi   :  20 cpse  :   0 
+dec   :   4 eor   :   0 fmul  :   0 fmuls :   0 fmulsu:   0 icall :   0 
+ijmp  :   0 in    :   3 inc   :  12 ld    :   7 ldd   :   0 ldi   :  65 
+lds   :   0 lpm   :   1 lsl   :   0 lsr   :   0 mov   :   8 movw  :   0 
+mul   :   2 muls  :   0 mulsu :   0 neg   :   0 nop   :   0 or    :   0 
+ori   :   0 out   :  23 pop   :   0 push  :   0 rcall :  41 ret   :   8 
+reti  :  13 rjmp  :  27 rol   :   0 ror   :   0 sbc   :   0 sbci  :   0 
+sbi   :   0 sbic  :   0 sbis  :   7 sbiw  :   0 sbr   :   3 sbrc  :   4 
+sbrs  :   0 sec   :   0 seh   :   0 sei   :  11 sen   :   0 ser   :   0 
 ses   :   0 set   :   0 sev   :   0 sez   :   0 sleep :   0 spm   :   0 
-st    :   0 std   :   0 sts   :   0 sub   :   5 subi  :   0 swap  :   0 
+st    :   6 std   :   0 sts   :   0 sub   :   1 subi  :   0 swap  :   0 
 tst   :   0 wdr   :   0 
-Instructions used: 12 out of 110 (10.9%)
+Instructions used: 28 out of 110 (25.5%)
 
 "ATmega8" memory use summary [bytes]:
 Segment   Begin    End      Code   Data   Used    Size   Use%
 ---------------------------------------------------------------
-[.cseg] 0x000000 0x0000c6    160     20    180    8192   2.2%
-[.dseg] 0x000060 0x000060      0      0      0    1024   0.0%
+[.cseg] 0x000000 0x000372    604    260    864    8192  10.5%
+[.dseg] 0x000060 0x00009c      0     60     60    1024   5.9%
 [.eseg] 0x000000 0x000000      0      0      0     512   0.0%
 
-Assembly complete, 0 errors, 2 warnings
+Assembly complete, 0 errors, 5 warnings

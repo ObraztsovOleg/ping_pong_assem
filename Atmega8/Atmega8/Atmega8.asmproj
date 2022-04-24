@@ -4,32 +4,19 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectVersion>5.1</ProjectVersion>
     <ToolchainName>com.Atmel.AVRAssembler</ToolchainName>
-    <ProjectGuid>{b1b3dcef-d1c2-4744-ae43-751d2cc21466}</ProjectGuid>
+    <ProjectGuid>{6c3cb569-214a-4969-b0ed-d7c8e73fa16a}</ProjectGuid>
     <avrdeviceseries>none</avrdeviceseries>
     <avrdevice>ATmega8</avrdevice>
     <OutputFileName>$(MSBuildProjectName)</OutputFileName>
     <OutputFileExtension>.obj</OutputFileExtension>
     <OutputDirectory>$(MSBuildProjectDirectory)\$(Configuration)</OutputDirectory>
     <Language>ASSEMBLY</Language>
-    <AssemblyName>AVRAssembler1</AssemblyName>
-    <Name>AVRAssembler1</Name>
-    <RootNamespace>AVRAssembler1</RootNamespace>
-    <EntryFile>$(MSBuildProjectDirectory)\AVRAssembler1.asm</EntryFile>
+    <AssemblyName>Atmega8</AssemblyName>
+    <Name>Atmega8</Name>
+    <RootNamespace>Atmega8</RootNamespace>
+    <EntryFile>$(MSBuildProjectDirectory)\Atmega8.asm</EntryFile>
     <ToolchainFlavour>Native</ToolchainFlavour>
     <AsfVersion>2.11.1</AsfVersion>
-    <avrtoolinterface />
-    <avrtool>com.atmel.avrdbg.tool.simulator</avrtool>
-    <com_atmel_avrdbg_tool_simulator>
-      <ToolType xmlns="">com.atmel.avrdbg.tool.simulator</ToolType>
-      <ToolName xmlns="">AVR Simulator</ToolName>
-      <ToolNumber xmlns="">
-      </ToolNumber>
-      <Channel xmlns="">
-        <host>127.0.0.1</host>
-        <port>50995</port>
-        <ssl>False</ssl>
-      </Channel>
-    </com_atmel_avrdbg_tool_simulator>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <ToolchainSettings>
@@ -37,7 +24,6 @@
   <avrasm.assembler.general.IncludeFile>($IncludeFile)</avrasm.assembler.general.IncludeFile>
 </AvrAssembler>
     </ToolchainSettings>
-    <OutputType>Executable</OutputType>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
     <ToolchainSettings>
@@ -47,7 +33,7 @@
     </ToolchainSettings>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="AVRAssembler1.asm">
+    <Compile Include="Atmega8.asm">
       <SubType>Code</SubType>
     </Compile>
   </ItemGroup>
